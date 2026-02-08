@@ -25,3 +25,9 @@ export type SnowFlake = {
     size: number;
     swayOffset: number;
 };
+
+export type HighScore = {
+    name: string;
+    score: number;
+    date: string;
+};
