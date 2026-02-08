@@ -9,27 +9,32 @@ const CANVAS_HEIGHT = 400;
 const COLS = CANVAS_WIDTH / CELL_SIZE;
 const ROWS = CANVAS_HEIGHT / CELL_SIZE;
 const MAX_HIGH_SCORES = 10;
+const FREEZE_DURATION = 150;
 
 // --- Retro Palette ---
 const COLORS = {
     bg: '#050510',
     p1: '#63c74d', // PICO-8 Green
+    p1Head: '#b87333', // Copper Color
     p1Highlight: '#b4eeb4',
     p2: '#ff004d', // PICO-8 Red/Pink
+    p2Head: '#ff77a8', // Brighter Pink
     p2Highlight: '#ff99aa',
     pacman: '#ffec27', // PICO-8 Yellow
     food: '#ff77a8', // Peach/Pink
     snow: '#c2c3c7', // Light Gray
     text: '#29adff',
     wall: '#5f574f',
-    grid: '#1d1d2b'
+    grid: '#1d1d2b',
+    eyeWhite: '#ffffff',
+    eyePupil: '#000000'
 };
 
 const Game: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     
     // --- React State for UI ---
-    const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover' | 'leaderboard'>('menu');
+    const [gameState, setGameState] = useState<'intro' | 'menu' | 'playing' | 'gameover' | 'leaderboard'>('intro');
     const [mode, setMode] = useState<GameMode>(GameMode.PVC);
     const [scores, setScores] = useState({ p1: 0, p2: 0, pacman: 0 });
     const [gameOverReason, setGameOverReason] = useState<string>('');
@@ -47,6 +52,8 @@ const Game: React.FC = () => {
     const moveTimer = useRef<number>(0);
     const moveInterval = useRef<number>(120); 
     const pacmanMoveTick = useRef<number>(0); 
+    const blinkTick = useRef<number>(0);
+    const isBlinking = useRef<boolean>(false);
     
     // Entities
     const snake1 = useRef<Point[]>([]);
@@ -138,7 +145,7 @@ const Game: React.FC = () => {
 
     // --- Leaderboard Logic ---
     useEffect(() => {
-        const stored = localStorage.getItem('snowflake_snake_scores');
+        const stored = localStorage.getItem('snake_vs_pacman_scores');
         if (stored) {
             setHighScores(JSON.parse(stored));
         } else {
@@ -158,14 +165,14 @@ const Game: React.FC = () => {
             .slice(0, MAX_HIGH_SCORES);
         
         setHighScores(updated);
-        localStorage.setItem('snowflake_snake_scores', JSON.stringify(updated));
+        localStorage.setItem('snake_vs_pacman_scores', JSON.stringify(updated));
     };
 
     const downloadScores = () => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(highScores, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", "snowflake_snake_scores.json");
+        downloadAnchorNode.setAttribute("download", "snake_vs_pacman_scores.json");
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
@@ -229,6 +236,8 @@ const Game: React.FC = () => {
         flashFrame.current = 0;
         shakeFrame.current = 0;
         particles.current = [];
+        blinkTick.current = 0;
+        isBlinking.current = false;
 
         // P1 Setup
         const startX = newMode === GameMode.PVP ? Math.floor(COLS * 0.75) : Math.floor(COLS / 2);
@@ -267,7 +276,10 @@ const Game: React.FC = () => {
     };
 
     const handleInput = useCallback((e: KeyboardEvent) => {
-        if (gameState === 'playing') {
+        if (gameState === 'intro') {
+             // Any key skips intro
+             setGameState('menu');
+        } else if (gameState === 'playing') {
             const k = e.key.toLowerCase();
             // P1
             if (k === 'arrowup' && dir1.current.y === 0) nextDir1.current = { x: 0, y: -1 };
@@ -292,6 +304,21 @@ const Game: React.FC = () => {
     // --- Main Game Loop ---
     const update = (dt: number) => {
         moveTimer.current += dt;
+
+        // Blink Logic
+        blinkTick.current += dt;
+        if (isBlinking.current) {
+            if (blinkTick.current > 150) { // Blink duration
+                isBlinking.current = false;
+                blinkTick.current = 0;
+            }
+        } else {
+            // Randomly blink every 2-5 seconds
+            if (blinkTick.current > 2000 + Math.random() * 3000) {
+                isBlinking.current = true;
+                blinkTick.current = 0;
+            }
+        }
 
         if (moveTimer.current > moveInterval.current) {
             moveTimer.current = 0;
@@ -323,8 +350,31 @@ const Game: React.FC = () => {
             if (checkCollision(head1, snake1.current)) p1Dead = true;
             if (mode === GameMode.PVP && checkCollision(head1, snake2.current)) p1Dead = true;
 
+            // Handle Pacman Interaction (Eat or Die)
+            let eatenPacman = false;
+            if (mode === GameMode.PVC && pacman.current && head1.x === pacman.current.x && head1.y === pacman.current.y) {
+                if (pacmanFrozen.current > 0) {
+                    // Eat Pacman
+                    setScores(s => ({ ...s, p1: s.p1 + 5 }));
+                    playSound('eat'); 
+                    spawnParticles(head1.x, head1.y, COLORS.pacman, 12);
+                    triggerShake(5);
+                    eatenPacman = true;
+                    
+                    // Respawn Pacman
+                    const exclude = [...snake1.current, food.current];
+                    if (powerup.current) exclude.push(powerup.current);
+                    pacman.current = placeItem(exclude);
+                    
+                    pacmanFrozen.current = 0; // End freeze
+                } else {
+                    p1Dead = true;
+                }
+            }
+
             if (!p1Dead) {
                 snake1.current.unshift(head1);
+                
                 if (head1.x === food.current.x && head1.y === food.current.y) {
                     setScores(s => ({ ...s, p1: s.p1 + 1 }));
                     playSound('eat');
@@ -339,12 +389,12 @@ const Game: React.FC = () => {
                 else if (powerup.current && head1.x === powerup.current.x && head1.y === powerup.current.y) {
                     setScores(s => ({ ...s, p1: s.p1 + 5 }));
                     playSound('powerup');
-                    pacmanFrozen.current = 50;
+                    pacmanFrozen.current = FREEZE_DURATION;
                     powerup.current = null;
                     flashFrame.current = 10;
                     triggerShake(10);
                 } 
-                else {
+                else if (!eatenPacman) {
                     snake1.current.pop();
                 }
             }
@@ -434,6 +484,11 @@ const Game: React.FC = () => {
                             playSound('pacman');
                             food.current = placeItem([...snake1.current]);
                         }
+                        
+                        // Check if ran into Snake (Normal death)
+                        if (pacman.current.x === snake1.current[0].x && pacman.current.y === snake1.current[0].y) {
+                            p1Dead = true;
+                        }
 
                         if (powerup.current && pacman.current.x === powerup.current.x && pacman.current.y === powerup.current.y) {
                             powerup.current = null; 
@@ -508,27 +563,56 @@ const Game: React.FC = () => {
             ctx.fillRect(Math.floor(f.x), Math.floor(f.y), Math.floor(f.size), Math.floor(f.size));
         });
 
-        const drawSnakeBlock = (x: number, y: number, color: string, highlight: string, isHead: boolean, direction?: Point) => {
+        const drawSnakeBlock = (x: number, y: number, color: string, highlight: string, headColor: string, isHead: boolean, direction?: Point) => {
             const px = x * CELL_SIZE;
             const py = y * CELL_SIZE;
             ctx.fillStyle = '#000'; ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
-            ctx.fillStyle = color; ctx.fillRect(px + 2, py + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+            
+            // Use Head Color if head
+            ctx.fillStyle = isHead ? headColor : color; 
+            ctx.fillRect(px + 2, py + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+            
             ctx.fillStyle = highlight; ctx.fillRect(px + 2, py + 2, 4, 4);
 
             if (isHead && direction) {
-                ctx.fillStyle = '#fff';
-                let lx=0, ly=0, rx=0, ry=0;
-                if (direction.y === -1) { lx=4; ly=4; rx=12; ry=4; } // Up
-                else if (direction.y === 1) { lx=4; ly=10; rx=12; ry=10; } // Down
-                else if (direction.x === -1) { lx=4; ly=4; rx=4; ry=12; } // Left
-                else { lx=10; ly=4; rx=10; ry=12; } // Right (default)
-                ctx.fillRect(px + lx, py + ly, 4, 4); 
-                ctx.fillRect(px + rx, py + ry, 4, 4);
-                ctx.fillStyle = '#000';
-                if (direction.x === 1) { ctx.fillRect(px+lx+2, py+ly+1, 2, 2); ctx.fillRect(px+rx+2, py+ry+1, 2, 2); }
-                else if (direction.x === -1) { ctx.fillRect(px+lx, py+ly+1, 2, 2); ctx.fillRect(px+rx, py+ry+1, 2, 2); }
-                else if (direction.y === 1) { ctx.fillRect(px+lx+1, py+ly+2, 2, 2); ctx.fillRect(px+rx+1, py+ry+2, 2, 2); }
-                else { ctx.fillRect(px+lx+1, py+ly, 2, 2); ctx.fillRect(px+rx+1, py+ry, 2, 2); }
+                // Determine eye positions based on direction
+                // Default RIGHT
+                let eye1 = {x: 12, y: 4};
+                let eye2 = {x: 12, y: 12};
+                
+                if (direction.x === -1) { // LEFT
+                    eye1 = {x: 4, y: 4};
+                    eye2 = {x: 4, y: 12};
+                } else if (direction.y === -1) { // UP
+                    eye1 = {x: 4, y: 4};
+                    eye2 = {x: 12, y: 4};
+                } else if (direction.y === 1) { // DOWN
+                    eye1 = {x: 4, y: 12};
+                    eye2 = {x: 12, y: 12};
+                }
+
+                if (isBlinking.current) {
+                    // Draw Closed Eyes (Line)
+                    ctx.fillStyle = COLORS.eyePupil;
+                    ctx.fillRect(px + eye1.x, px + eye1.y + 2, 4, 1);
+                    ctx.fillRect(px + eye2.x, px + eye2.y + 2, 4, 1);
+                } else {
+                    // Draw Whites
+                    ctx.fillStyle = COLORS.eyeWhite;
+                    ctx.fillRect(px + eye1.x, py + eye1.y, 4, 4);
+                    ctx.fillRect(px + eye2.x, py + eye2.y, 4, 4);
+                    
+                    // Draw Pupils
+                    ctx.fillStyle = COLORS.eyePupil;
+                    let pOx = 0, pOy = 0;
+                    if(direction.x === 1) pOx = 2;
+                    else if(direction.x === -1) pOx = 0;
+                    else if(direction.y === 1) pOy = 2;
+                    else if(direction.y === -1) pOy = 0;
+
+                    ctx.fillRect(px + eye1.x + pOx, py + eye1.y + pOy, 2, 2);
+                    ctx.fillRect(px + eye2.x + pOx, py + eye2.y + pOy, 2, 2);
+                }
             }
         };
 
@@ -551,9 +635,9 @@ const Game: React.FC = () => {
             ctx.fillRect(px + 2, py + 10 + floatY, 16, 4);
         }
 
-        snake1.current.forEach((p, i) => drawSnakeBlock(p.x, p.y, COLORS.p1, COLORS.p1Highlight, i===0, dir1.current));
+        snake1.current.forEach((p, i) => drawSnakeBlock(p.x, p.y, COLORS.p1, COLORS.p1Highlight, COLORS.p1Head, i===0, dir1.current));
         if (mode === GameMode.PVP) {
-            snake2.current.forEach((p, i) => drawSnakeBlock(p.x, p.y, COLORS.p2, COLORS.p2Highlight, i===0, dir2.current));
+            snake2.current.forEach((p, i) => drawSnakeBlock(p.x, p.y, COLORS.p2, COLORS.p2Highlight, COLORS.p2Head, i===0, dir2.current));
         }
 
         if (pacman.current) {
@@ -585,6 +669,15 @@ const Game: React.FC = () => {
             }
         });
         particles.current = particles.current.filter(p => p.life > 0);
+        
+        // Timer Bar (Foreground)
+        if (pacmanFrozen.current > 0) {
+            const barWidth = (pacmanFrozen.current / FREEZE_DURATION) * (CANVAS_WIDTH - 40);
+            ctx.fillStyle = '#29adff';
+            ctx.fillRect(20, 10, barWidth, 6);
+            ctx.strokeStyle = '#fff';
+            ctx.strokeRect(20, 10, CANVAS_WIDTH - 40, 6);
+        }
 
         if (flashFrame.current > 0) {
             ctx.fillStyle = `rgba(255,255,255,${flashFrame.current * 0.1})`;
@@ -654,20 +747,22 @@ const Game: React.FC = () => {
             />
             
             {/* Scoreboard */}
-            <div className="absolute top-4 left-4 font-pixel text-[10px] leading-loose text-white bg-black/70 p-2 rounded border border-gray-700 pointer-events-none z-10">
-                {mode === GameMode.PVC ? (
-                    <>
-                        <div className="text-[#63c74d]">SCORE: {scores.p1}</div>
-                        <div className="text-[#ffec27]">PACMAN: {scores.pacman}</div>
-                        {highScores.length > 0 && <div className="text-[#29adff]">HI: {highScores[0].score}</div>}
-                    </>
-                ) : (
-                    <>
-                        <div className="text-[#63c74d]">P1 (GREEN): {scores.p1}</div>
-                        <div className="text-[#ff004d]">P2 (RED): {scores.p2}</div>
-                    </>
-                )}
-            </div>
+            {gameState === 'playing' && (
+                <div className="absolute top-4 left-4 font-pixel text-[10px] leading-loose text-white bg-black/70 p-2 rounded border border-gray-700 pointer-events-none z-10">
+                    {mode === GameMode.PVC ? (
+                        <>
+                            <div className="text-[#63c74d]">SCORE: {scores.p1}</div>
+                            <div className="text-[#ffec27]">PACMAN: {scores.pacman}</div>
+                            {highScores.length > 0 && <div className="text-[#29adff]">HI: {highScores[0].score}</div>}
+                        </>
+                    ) : (
+                        <>
+                            <div className="text-[#63c74d]">P1 (GREEN): {scores.p1}</div>
+                            <div className="text-[#ff004d]">P2 (RED): {scores.p2}</div>
+                        </>
+                    )}
+                </div>
+            )}
 
             <button 
                 className="absolute top-4 right-4 bg-black/80 text-white p-2 rounded border border-white hover:bg-white hover:text-black z-30 font-pixel text-[10px]"
@@ -678,9 +773,35 @@ const Game: React.FC = () => {
 
             {/* Menus */}
             {gameState !== 'playing' && (
-                <div className="absolute inset-0 bg-[#050510]/95 flex flex-col items-center justify-center text-center p-8 z-20 overflow-y-auto">
+                <div className="absolute inset-0 bg-[#050510]/95 flex flex-col items-center justify-center text-center p-8 z-20 overflow-y-auto overflow-x-hidden">
                     
-                    {gameState === 'leaderboard' ? (
+                    {gameState === 'intro' ? (
+                        <div className="flex flex-col items-center justify-center h-full w-full relative">
+                            <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#050510] to-transparent z-20 pointer-events-none"></div>
+                            <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#050510] to-transparent z-20 pointer-events-none"></div>
+                            
+                            <div className="relative w-3/4 h-[80%] overflow-hidden perspective-[400px]">
+                                <div className="scrolling-text font-pixel text-[#ffec27] text-center text-xs leading-loose">
+                                    <p className="mb-8">IN A WORLD OF PIXELS...</p>
+                                    <p className="mb-8">SNAKE MEETS PACMAN...</p>
+                                    <p className="mb-8 text-[#63c74d]">THE ULTIMATE CROSSOVER...</p>
+                                    <p className="mb-8">EAT FOOD TO GROW...</p>
+                                    <p className="mb-8 text-[#ff004d]">AVOID THE WALLS...</p>
+                                    <p className="mb-8 text-[#ffec27]">WATCH OUT FOR PACMAN...</p>
+                                    <p className="mb-8 text-[#29adff]">GRAB THE POWERUP...</p>
+                                    <p className="mb-8">TO FREEZE AND FEAST...</p>
+                                    <p className="mb-32">ARE YOU READY?</p>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={() => setGameState('menu')}
+                                className="absolute bottom-10 z-30 animate-pulse font-pixel text-[10px] text-white bg-blue-600/50 px-4 py-2 rounded hover:bg-blue-600 border border-blue-400"
+                            >
+                                CLICK TO START
+                            </button>
+                        </div>
+                    ) : gameState === 'leaderboard' ? (
                         <div className="w-full max-w-sm">
                              <h1 className="font-pixel text-xl text-[#ffec27] mb-6 animate-pulse">HIGH SCORES</h1>
                              <div className="flex justify-between font-pixel text-[10px] text-gray-500 mb-2 px-2 border-b border-gray-700 pb-1">
@@ -715,7 +836,7 @@ const Game: React.FC = () => {
                     ) : (
                         <>
                             <h1 className="font-pixel text-2xl text-[#aeeaff] mb-6 shadow-black drop-shadow-md leading-relaxed animate-pulse">
-                                {gameState === 'gameover' ? gameOverReason : <>SNOWFLAKE<br/>SNAKE 8-BIT</>}
+                                {gameState === 'gameover' ? gameOverReason : <>SNAKE VS<br/>PACMAN</>}
                             </h1>
                             
                             {gameState === 'gameover' && (
@@ -776,9 +897,11 @@ const Game: React.FC = () => {
             )}
             
             {/* Mobile Controls Overlay */}
-            <div className="lg:hidden absolute bottom-4 left-1/2 -translate-x-1/2 z-30 opacity-70">
-                <Joystick onDirection={handleJoystick} />
-            </div>
+            {gameState === 'playing' && (
+                <div className="lg:hidden absolute bottom-4 left-1/2 -translate-x-1/2 z-30 opacity-70">
+                    <Joystick onDirection={handleJoystick} />
+                </div>
+            )}
         </div>
     );
 };

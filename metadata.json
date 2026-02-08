@@ -1,5 +1,5 @@
 {
-  "name": "Snowflake Snake 8-Bit",
+  "name": "Snake vs Pacman",
   "description": "A retro-enhanced 8-bit version of Snake vs Pacman with pixel-perfect graphics and CRT effects.",
   "requestFramePermissions": []
 }

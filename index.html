@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
-    <title>Snowflake Snake 8-Bit</title>
+    <title>Snake vs Pacman</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
@@ -38,6 +38,14 @@
       /* Pixel font application */
       .font-pixel {
         font-family: 'Press Start 2P', cursive;
+      }
+      
+      @keyframes scrollText {
+        0% { transform: translateY(100%); }
+        100% { transform: translateY(-150%); }
+      }
+      .scrolling-text {
+        animation: scrollText 20s linear infinite;
       }
     </style>
   <script type="importmap">
