@@ -403,8 +403,31 @@ const Game: React.FC = () => {
                         if (Math.abs(dx) > Math.abs(dy)) pDirX = dx > 0 ? 1 : -1;
                         else pDirY = dy > 0 ? 1 : -1;
                         
-                        pacman.current.x = wrap(pacman.current.x + pDirX, COLS);
-                        pacman.current.y = wrap(pacman.current.y + pDirY, ROWS);
+                        // Try primary direction
+                        let targetX = wrap(pacman.current.x + pDirX, COLS);
+                        let targetY = wrap(pacman.current.y + pDirY, ROWS);
+
+                        // If blocked, try secondary axis
+                        if (checkCollision({x: targetX, y: targetY}, snake1.current)) {
+                            pDirX = 0; pDirY = 0;
+                             if (Math.abs(dx) > Math.abs(dy)) {
+                                 // Was X, try Y
+                                 if (dy !== 0) pDirY = dy > 0 ? 1 : -1;
+                                 else pDirY = Math.random() > 0.5 ? 1 : -1;
+                             } else {
+                                 // Was Y, try X
+                                 if (dx !== 0) pDirX = dx > 0 ? 1 : -1;
+                                 else pDirX = Math.random() > 0.5 ? 1 : -1;
+                             }
+                             targetX = wrap(pacman.current.x + pDirX, COLS);
+                             targetY = wrap(pacman.current.y + pDirY, ROWS);
+                        }
+                        
+                        // Move if not blocked
+                        if (!checkCollision({x: targetX, y: targetY}, snake1.current)) {
+                            pacman.current.x = targetX;
+                            pacman.current.y = targetY;
+                        }
 
                         if (pacman.current.x === food.current.x && pacman.current.y === food.current.y) {
                             setScores(s => ({ ...s, pacman: s.pacman + 1 }));
