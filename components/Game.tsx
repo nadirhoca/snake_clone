@@ -348,7 +348,7 @@ const Game: React.FC = () => {
             const head1 = { x: wrap(nextX1, COLS), y: wrap(nextY1, ROWS) };
             
             if (checkCollision(head1, snake1.current)) p1Dead = true;
-            if (mode === GameMode.PVP && checkCollision(head1, snake2.current)) p1Dead = true;
+            if (checkCollision(head1, snake2.current)) p1Dead = true;
 
             // Handle Pacman Interaction (Eat or Die)
             let eatenPacman = false;
@@ -776,11 +776,23 @@ const Game: React.FC = () => {
                 <div className="absolute inset-0 bg-[#050510]/95 flex flex-col items-center justify-center text-center p-8 z-20 overflow-y-auto overflow-x-hidden">
                     
                     {gameState === 'intro' ? (
-                        <div className="flex flex-col items-center justify-center h-full w-full relative">
+                        <div className="flex flex-col items-center justify-center h-full w-full relative pt-8">
                             <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#050510] to-transparent z-20 pointer-events-none"></div>
                             <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#050510] to-transparent z-20 pointer-events-none"></div>
                             
-                            <div className="relative w-3/4 h-[80%] overflow-hidden perspective-[400px]">
+                            {/* Banner Image */}
+                            <div className="z-20 mb-4 px-4 w-full flex justify-center">
+                                 <img 
+                                    src="/banner.png" 
+                                    alt="Snake vs Pacman Banner" 
+                                    className="max-w-full h-auto max-h-[120px] object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] border-2 border-white/20 rounded"
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                    }}
+                                 />
+                            </div>
+
+                            <div className="relative w-3/4 h-[50%] overflow-hidden perspective-[400px]">
                                 <div className="scrolling-text font-pixel text-[#ffec27] text-center text-xs leading-loose">
                                     <p className="mb-8">IN A WORLD OF PIXELS...</p>
                                     <p className="mb-8">SNAKE MEETS PACMAN...</p>
