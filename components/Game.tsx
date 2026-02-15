@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameMode, Point, Particle, SnowFlake, HighScore } from '../types';
 import { Joystick } from './Joystick';
+import { BANNER_SRC } from '../assets';
 
-// Use root relative path for the manually added banner.png
-// Since this is a static asset served at the root alongside index.html
-const bannerImg = 'banner.png';
+// Try to load the local banner.png first.
+// If it fails (404/wrong path), the onError handler in the img tag will swap it to the SVG fallback.
+const LOCAL_BANNER_PATH = './banner.png';
 
 // --- Constants ---
 const CELL_SIZE = 20;
@@ -787,7 +788,11 @@ const Game: React.FC = () => {
                             {/* Banner Image */}
                             <div className="z-20 mb-4 px-4 w-full flex justify-center">
                                  <img 
-                                    src={bannerImg} 
+                                    src={LOCAL_BANNER_PATH}
+                                    onError={(e) => {
+                                        e.currentTarget.onerror = null; // Prevent infinite loop
+                                        e.currentTarget.src = BANNER_SRC;
+                                    }}
                                     alt="Snake vs Pacman Banner" 
                                     className="max-w-full h-auto max-h-[120px] object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] border-2 border-white/20 rounded bg-black/50"
                                  />
