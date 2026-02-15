@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameMode, Point, Particle, SnowFlake, HighScore } from '../types';
 import { Joystick } from './Joystick';
 
-// Use direct path for the image to avoid module resolution issues
-const bannerImg = './banner.png';
+// Use root relative path for the manually added banner.png
+// Since this is a static asset served at the root alongside index.html
+const bannerImg = 'banner.png';
 
 // --- Constants ---
 const CELL_SIZE = 20;
@@ -788,10 +789,7 @@ const Game: React.FC = () => {
                                  <img 
                                     src={bannerImg} 
                                     alt="Snake vs Pacman Banner" 
-                                    className="max-w-full h-auto max-h-[120px] object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] border-2 border-white/20 rounded"
-                                    onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                    }}
+                                    className="max-w-full h-auto max-h-[120px] object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] border-2 border-white/20 rounded bg-black/50"
                                  />
                             </div>
 
