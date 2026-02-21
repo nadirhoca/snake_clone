@@ -8,6 +8,20 @@ export enum GameMode {
     PVP = 'pvp'  // Player vs Player
 }
 
+export enum PowerupType {
+    FREEZE = 'freeze',
+    SPEED = 'speed',
+    SLOW = 'slow',
+    GHOST = 'ghost',
+    SHRINK = 'shrink'
+}
+
+export type Powerup = {
+    x: number;
+    y: number;
+    type: PowerupType;
+};
+
 export type Particle = {
     x: number;
     y: number;

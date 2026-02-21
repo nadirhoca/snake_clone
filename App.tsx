@@ -5,7 +5,7 @@ const App: React.FC = () => {
   const [crtEnabled, setCrtEnabled] = useState(true);
 
   return (
-    <div className="relative w-screen h-screen flex items-center justify-center bg-[#050510] text-white overflow-hidden">
+    <div className="relative w-screen h-screen flex items-center justify-center bg-[#050510] text-white overflow-auto">
       {/* Visual Effects Layer */}
       {crtEnabled && (
         <>
